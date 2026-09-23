@@ -24,7 +24,9 @@ That makes it useful for the things the app is bad at: searching your own purcha
 go install github.com/jgalea/ali-cli/cmd/ali@latest
 ```
 
-Needs Go 1.26+ and a local Chrome or Chromium.
+Needs Go 1.26+ and a local Chrome or Chromium. It runs on macOS, Linux and Windows.
+
+On Windows, `~` below means your user folder (`%USERPROFILE%`), so the profile lives in `%USERPROFILE%\.ali`. Chrome is found in the usual install locations on each OS; if yours lives elsewhere, point `ALI_CHROME` at it.
 
 ## Use
 

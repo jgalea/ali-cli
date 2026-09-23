@@ -49,11 +49,15 @@ func chromePath() string {
 		},
 		"linux": {
 			"/usr/bin/google-chrome",
+			"/usr/bin/google-chrome-stable",
 			"/usr/bin/chromium",
 			"/usr/bin/chromium-browser",
+			"/snap/bin/chromium",
 		},
 		"windows": {
 			`C:\Program Files\Google\Chrome\Application\chrome.exe`,
+			`C:\Program Files (x86)\Google\Chrome\Application\chrome.exe`,
+			filepath.Join(os.Getenv("LOCALAPPDATA"), `Google\Chrome\Application\chrome.exe`),
 		},
 	}
 	for _, p := range candidates[runtime.GOOS] {
@@ -104,6 +108,12 @@ func Open(parent context.Context, o Options) (*Session, error) {
 // answers a second launch on a locked profile by handing the URL to the
 // running instance and exiting, which reads as a start failure here.
 func inUse(dir string) bool {
+	if runtime.GOOS == "windows" {
+		// Windows Chrome holds a delete-on-close "lockfile" instead of a
+		// SingletonLock symlink, so it only exists while Chrome is running.
+		_, err := os.Stat(filepath.Join(dir, "lockfile"))
+		return err == nil
+	}
 	target, err := os.Readlink(filepath.Join(dir, "SingletonLock"))
 	if err != nil {
 		return false
