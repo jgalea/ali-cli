@@ -57,8 +57,13 @@ func chromePath() string {
 		"windows": {
 			`C:\Program Files\Google\Chrome\Application\chrome.exe`,
 			`C:\Program Files (x86)\Google\Chrome\Application\chrome.exe`,
-			filepath.Join(os.Getenv("LOCALAPPDATA"), `Google\Chrome\Application\chrome.exe`),
 		},
+	}
+	// Per-user installs live under LOCALAPPDATA. Only trust it as an absolute
+	// path, or an unset variable would resolve chrome.exe against the cwd.
+	if local := os.Getenv("LOCALAPPDATA"); filepath.IsAbs(local) {
+		candidates["windows"] = append(candidates["windows"],
+			filepath.Join(local, `Google\Chrome\Application\chrome.exe`))
 	}
 	for _, p := range candidates[runtime.GOOS] {
 		if _, err := os.Stat(p); err == nil {
