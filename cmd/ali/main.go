@@ -27,6 +27,7 @@ Usage:
   ali orders [flags]     list your orders
   ali item <id|url>      price, shipping, VAT and seller details for one product
   ali search <query>     list search results
+  ali cart               read your shopping cart and its bundle-deals basket
   ali dump [file]        save the rendered order page, for fixing selectors
 
 Flags:
@@ -91,6 +92,8 @@ func run(args []string) error {
 			return fmt.Errorf("usage: ali item <id|url>")
 		}
 		return item(profile, pos[0], *show, *asJSON, *asTOON)
+	case "cart":
+		return cart(profile, *show, *asJSON, *asTOON)
 	case "search":
 		if len(pos) == 0 {
 			return fmt.Errorf("usage: ali search <query>")
@@ -340,6 +343,102 @@ func search(profile, query, shipsFrom string, limit int, show, asJSON, asTOON bo
 		fmt.Println("    " + truncate(r.Title, 96))
 	}
 	return nil
+}
+
+func cart(profile string, show, asJSON, asTOON bool) error {
+	s, err := session(profile, !show, 4*time.Minute)
+	if err != nil {
+		return err
+	}
+	defer s.Close()
+
+	restore(s)
+
+	c, err := catalog.FetchCart(s.Ctx)
+	if err != nil {
+		return err
+	}
+	if asJSON || asTOON {
+		return emit(c, asTOON)
+	}
+	avail := 0
+	for _, l := range c.Lines {
+		if l.Available {
+			avail++
+		}
+	}
+	fmt.Printf("Cart: %d lines (%d available, %d unavailable), %d selected\n", len(c.Lines), avail, len(c.Lines)-avail, c.Summary.Selected)
+	for _, l := range c.Lines {
+		printCartLine(l)
+	}
+	sum := c.Summary
+	shipping := sum.Shipping
+	if sum.ShippingFree {
+		shipping = "free"
+	}
+	fmt.Printf("\nSelected %d: subtotal EUR %.2f, shipping %s, estimated total EUR %.2f\n", sum.Selected, sum.Subtotal, shipping, sum.EstimatedTotal)
+	fmt.Println("\nBundle-deals basket")
+	if !c.Bundle.Reachable {
+		fmt.Println("  not read: " + c.Bundle.Note)
+	} else {
+		if c.Bundle.Status != "" {
+			fmt.Printf("  status: %s (%d items needed)\n", c.Bundle.Status, c.Bundle.Needed)
+		}
+		if len(c.Bundle.Items) == 0 {
+			fmt.Println("  empty")
+		}
+		for _, l := range c.Bundle.Items {
+			printCartLine(l)
+		}
+	}
+	for _, w := range c.Warnings {
+		fmt.Fprintln(os.Stderr, "warning: "+w)
+	}
+	return nil
+}
+
+func printCartLine(l catalog.Line) {
+	mark := "[ ]"
+	switch {
+	case !l.Available:
+		mark = "[-]"
+	case l.Selected:
+		mark = "[x]"
+	}
+	head := fmt.Sprintf("%s %s", mark, l.ID)
+	if l.Available {
+		head += fmt.Sprintf("  %s %.2f", l.Currency, l.UnitPrice)
+	}
+	if l.Quantity > 1 {
+		head += fmt.Sprintf(" x%d", l.Quantity)
+	}
+	if l.StockWarning != "" {
+		head += "  (" + l.StockWarning + ")"
+	}
+	fmt.Println(head)
+	fmt.Println("    " + truncate(l.Title, 96))
+	if l.Variant != "" {
+		fmt.Println("    variant: " + l.Variant)
+	}
+	if l.Store != "" {
+		fmt.Println("    store:   " + l.Store)
+	}
+	tax := ""
+	if l.VATIncluded {
+		tax = "VAT included"
+	}
+	switch l.ImportCharges {
+	case "none":
+		tax += ", no import charges"
+	case "apply":
+		tax += ", import charges apply"
+	}
+	if tax = strings.TrimPrefix(tax, ", "); tax != "" {
+		fmt.Println("    tax:     " + tax)
+	}
+	if l.Notice != "" {
+		fmt.Println("    notice:  " + l.Notice)
+	}
 }
 
 func dump(profile, out string) error {

@@ -6,7 +6,7 @@
   <img src="https://img.shields.io/badge/SINGLE%20BINARY-no%20runtime%20deps-brightgreen?style=for-the-badge" alt="Single binary">
 </p>
 
-<p align="center"><strong>Unofficial, agent-friendly CLI for your own AliExpress order history. Sign in once by hand, then read your orders as text, JSON or TOON.</strong></p>
+<p align="center"><strong>Unofficial, agent-friendly CLI for your own AliExpress account. Sign in once by hand, then read your orders, product pages, search results and shopping cart as text, JSON or TOON.</strong></p>
 
 ---
 
@@ -39,6 +39,7 @@ ali orders --limit 0 --expand   # everything, titles filled in
 ali orders --grep wax  # only orders with a matching item title
 ali item 1005011605911641       # one product, by id or URL
 ali search "air blower" --ships-from EU --limit 10
+ali cart                        # cart lines, totals and the bundle-deals basket
 ```
 
 Every command takes `--json`, or `--toon` for [TOON](https://github.com/toon-format/toon-go) when you are feeding an LLM and want fewer tokens.
@@ -71,6 +72,39 @@ $ ali search "air blower" --ships-from PL --limit 3
 ```
 
 `--ships-from` takes `EU` or a two-letter country code and passes AliExpress's own "Ship from" filter in the URL, so the results are filtered by the site. Result cards do not print the origin, so the country shown in the list is the one you asked for. Output is English text from the storefront; `--json` and `--toon` work as with `orders`.
+
+## Cart
+
+`ali cart` reads the cart page and prints every line: title, variant, store, unit price, whether VAT is included, whether import charges apply, any stock warning, whether the line is ticked for checkout, and the item id. Unavailable lines are listed with the reason the site gives. The summary shows subtotal, shipping, estimated total and the number of selected items. It then opens the separate bundle-deals basket and shows its items and how many more are needed; if that basket cannot be reached, the output says so. Read only: it scrolls the page to load every line and reads checkbox state, and clicks nothing.
+
+```
+$ ali cart
+Cart: 4 lines (3 available, 1 unavailable), 2 selected
+[x] 1005000000000001  EUR 18.03  (Only 1 left)
+    Example turbo fan, 10 speeds, with display
+    variant: Blue/Poland
+    store:   Example Store
+    tax:     VAT included, no import charges
+[x] 1005000000000002  EUR 9.89
+    Example 4-piece RC tire set
+    store:   Sample Hobby Store
+    tax:     VAT included, import charges apply
+[ ] 1005000000000003  EUR 2.81
+    Example self-adhesive film
+[-] 
+    Example retired item
+    notice:  Item unavailable
+
+Selected 2: subtotal EUR 27.92, shipping free, estimated total EUR 27.92
+
+Bundle-deals basket
+  status: Add 3 from "Toys" for duty covered & free shipping (3 items needed)
+[ ]   EUR 6.28  (Almost sold out)
+    Example steering part
+    variant: 16005
+```
+
+The page renders in Spanish or English depending on the session. Both are understood; a label it does not know makes the command fail with the text it could not read, so a changed storefront shows up as an error rather than as wrong numbers.
 
 ## How it works
 
