@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/jgalea/ali-cli/internal/browser"
 	"github.com/jgalea/ali-cli/internal/catalog"
@@ -220,11 +221,11 @@ func list(profile string, limit int, grep string, expand, show, asJSON, asTOON b
 		if o.Status != "" {
 			header += "  [" + o.Status + "]"
 		}
-		fmt.Println(header)
+		say(header)
 		for _, it := range o.Items {
-			fmt.Println("    " + truncate(it.Title, 96))
+			say("    " + truncate(it.Title, 96))
 		}
-		fmt.Println("    " + o.URL)
+		say("    " + o.URL)
 	}
 	return nil
 }
@@ -249,12 +250,12 @@ func item(profile, arg string, show, asJSON, asTOON bool) error {
 	if asJSON || asTOON {
 		return emit(it, asTOON)
 	}
-	fmt.Println(it.Title)
+	say(it.Title)
 	price := fmt.Sprintf("%s %.2f", it.Currency, it.Price)
 	if it.Lowest30Days > 0 {
 		price += fmt.Sprintf("  (30-day lowest %.2f)", it.Lowest30Days)
 	}
-	fmt.Println("  price:     " + price)
+	say("  price:     " + price)
 	tax := "VAT not stated"
 	if it.VATIncluded {
 		tax = "VAT included"
@@ -265,37 +266,37 @@ func item(profile, arg string, show, asJSON, asTOON bool) error {
 	case "apply":
 		tax += ", import charges apply"
 	}
-	fmt.Println("  tax:       " + tax)
+	say("  tax:       " + tax)
 	if it.ShipsFrom != "" {
-		fmt.Println("  ships from: " + it.ShipsFrom)
+		say("  ships from: " + it.ShipsFrom)
 	}
 	if it.Delivery != "" {
-		fmt.Println("  delivery:  " + it.Delivery)
+		say("  delivery:  " + it.Delivery)
 	}
 	if it.Rating != "" {
-		fmt.Printf("  rating:    %s (%s reviews)\n", it.Rating, it.Reviews)
+		sayf("  rating:    %s (%s reviews)\n", it.Rating, it.Reviews)
 	}
 	if it.Sold != "" {
-		fmt.Println("  sold:      " + it.Sold)
+		say("  sold:      " + it.Sold)
 	}
 	if it.Store != "" {
 		store := it.Store
 		if it.StorePositive != "" {
 			store += " (" + it.StorePositive + " positive)"
 		}
-		fmt.Println("  store:     " + store)
+		say("  store:     " + store)
 	}
 	for _, v := range it.Variants {
 		line := fmt.Sprintf("  %s: %s", v.Name, strings.Join(v.Options, ", "))
 		if v.Count > len(v.Options) {
 			line += fmt.Sprintf(" (%d options)", v.Count)
 		}
-		fmt.Println(line)
+		say(line)
 	}
 	if it.Bundle {
-		fmt.Println("  bundle deals: yes")
+		say("  bundle deals: yes")
 	}
-	fmt.Println("  " + it.URL)
+	say("  " + it.URL)
 	return nil
 }
 
@@ -339,8 +340,8 @@ func search(profile, query, shipsFrom string, limit int, show, asJSON, asTOON bo
 		if r.Bundle {
 			line += "  [bundle deals]"
 		}
-		fmt.Println(line)
-		fmt.Println("    " + truncate(r.Title, 96))
+		say(line)
+		say("    " + truncate(r.Title, 96))
 	}
 	return nil
 }
@@ -367,7 +368,7 @@ func cart(profile string, show, asJSON, asTOON bool) error {
 			avail++
 		}
 	}
-	fmt.Printf("Cart: %d lines (%d available, %d unavailable), %d selected\n", len(c.Lines), avail, len(c.Lines)-avail, c.Summary.Selected)
+	sayf("Cart: %d lines (%d available, %d unavailable), %d selected\n", len(c.Lines), avail, len(c.Lines)-avail, c.Summary.Selected)
 	for _, l := range c.Lines {
 		printCartLine(l)
 	}
@@ -376,16 +377,16 @@ func cart(profile string, show, asJSON, asTOON bool) error {
 	if sum.ShippingFree {
 		shipping = "free"
 	}
-	fmt.Printf("\nSelected %d: subtotal EUR %.2f, shipping %s, estimated total EUR %.2f\n", sum.Selected, sum.Subtotal, shipping, sum.EstimatedTotal)
-	fmt.Println("\nBundle-deals basket")
+	sayf("\nSelected %d: subtotal EUR %.2f, shipping %s, estimated total EUR %.2f\n", sum.Selected, sum.Subtotal, shipping, sum.EstimatedTotal)
+	say("\nBundle-deals basket")
 	if !c.Bundle.Reachable {
-		fmt.Println("  not read: " + c.Bundle.Note)
+		say("  not read: " + c.Bundle.Note)
 	} else {
 		if c.Bundle.Status != "" {
-			fmt.Printf("  status: %s (%d items needed)\n", c.Bundle.Status, c.Bundle.Needed)
+			sayf("  status: %s (%d items needed)\n", c.Bundle.Status, c.Bundle.Needed)
 		}
 		if len(c.Bundle.Items) == 0 {
-			fmt.Println("  empty")
+			say("  empty")
 		}
 		for _, l := range c.Bundle.Items {
 			printCartLine(l)
@@ -415,13 +416,13 @@ func printCartLine(l catalog.Line) {
 	if l.StockWarning != "" {
 		head += "  (" + l.StockWarning + ")"
 	}
-	fmt.Println(head)
-	fmt.Println("    " + truncate(l.Title, 96))
+	say(head)
+	say("    " + truncate(l.Title, 96))
 	if l.Variant != "" {
-		fmt.Println("    variant: " + l.Variant)
+		say("    variant: " + l.Variant)
 	}
 	if l.Store != "" {
-		fmt.Println("    store:   " + l.Store)
+		say("    store:   " + l.Store)
 	}
 	tax := ""
 	if l.VATIncluded {
@@ -434,10 +435,10 @@ func printCartLine(l catalog.Line) {
 		tax += ", import charges apply"
 	}
 	if tax = strings.TrimPrefix(tax, ", "); tax != "" {
-		fmt.Println("    tax:     " + tax)
+		say("    tax:     " + tax)
 	}
 	if l.Notice != "" {
-		fmt.Println("    notice:  " + l.Notice)
+		say("    notice:  " + l.Notice)
 	}
 }
 
@@ -489,6 +490,23 @@ func truncate(s string, n int) string {
 		return s
 	}
 	return string(r[:n-1]) + "…"
+}
+
+func safe(s string) string {
+	return strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) && r != '\n' && r != '\t' {
+			return -1
+		}
+		return r
+	}, s)
+}
+
+func say(s string) {
+	fmt.Println(safe(s))
+}
+
+func sayf(format string, a ...any) {
+	fmt.Print(safe(fmt.Sprintf(format, a...)))
 }
 
 func emit(v any, asTOON bool) error {
