@@ -37,6 +37,8 @@ ali orders             # recent orders, one block each
 ali orders --limit 50 --json
 ali orders --limit 0 --expand   # everything, titles filled in
 ali orders --grep wax  # only orders with a matching item title
+ali item 1005011605911641       # one product, by id or URL
+ali search "air blower" --ships-from EU --limit 10
 ```
 
 Every command takes `--json`, or `--toon` for [TOON](https://github.com/toon-format/toon-go) when you are feeding an LLM and want fewer tokens.
@@ -49,6 +51,26 @@ $ ali orders --grep wax
 ```
 
 (Illustrative shape, not a real order.)
+
+## Products and search
+
+`ali item` prints the title, price, 30-day lowest price, whether VAT is included, whether import charges apply, ships-from country, delivery estimate, rating, reviews, units sold, store name with its positive-feedback rate, variants, and the bundle-deals tag. `ali search` lists id, title, price, rating, units sold, the free-shipping or Choice badge and the bundle tag. Both use the es.aliexpress.com storefront and the saved session, so prices are the ones your account sees. Both read only: nothing is clicked except page navigation.
+
+```
+$ ali item 1005011605911641
+Foursun 130000 RPM Turbo Violent Fan, 10-Speed with Display, ...
+  price:     EUR 18.03  (30-day lowest 21.93)
+  tax:       VAT included, no import charges
+  ships from: Poland
+  rating:    4.8 (1160 reviews)
+  store:     Foursun Auto Store (96.0% positive)
+
+$ ali search "air blower" --ships-from PL --limit 3
+1005013370091652  EUR 29.13  12 sold  from PL
+    130000RPM Powerful Cordless Turbo Air Blower, 2-in-1 Electric Air Duster ...
+```
+
+`--ships-from` takes `EU` or a two-letter country code and passes AliExpress's own "Ship from" filter in the URL, so the results are filtered by the site. Result cards do not print the origin, so the country shown in the list is the one you asked for. Output is English text from the storefront; `--json` and `--toon` work as with `orders`.
 
 ## How it works
 

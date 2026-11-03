@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/jgalea/ali-cli/internal/browser"
+	"github.com/jgalea/ali-cli/internal/catalog"
 	"github.com/jgalea/ali-cli/internal/orders"
 	toon "github.com/toon-format/toon-go"
 )
@@ -24,10 +25,13 @@ Usage:
   ali login              sign in by hand, once, in a dedicated Chrome profile
   ali status             check whether that profile is still signed in
   ali orders [flags]     list your orders
+  ali item <id|url>      price, shipping, VAT and seller details for one product
+  ali search <query>     list search results
   ali dump [file]        save the rendered order page, for fixing selectors
 
 Flags:
-  --limit N     how many orders to return (default 20, 0 for all loaded)
+  --limit N     how many orders or results to return (default 20, 0 for all loaded)
+  --ships-from  search only: EU or a two-letter country code (PL, ES, DE...)
   --grep TEXT   only orders with an item title matching TEXT
   --json        emit JSON
   --toon        emit TOON instead of JSON (fewer tokens, for agents)
@@ -61,7 +65,9 @@ func run(args []string) error {
 	asTOON := fs.Bool("toon", false, "emit TOON")
 	show := fs.Bool("show", false, "run with a visible window")
 	expand := fs.Bool("expand", false, "open each multi-item order for its item titles")
-	if err := fs.Parse(rest); err != nil {
+	shipsFrom := fs.String("ships-from", "", "search only: EU or a two-letter country code")
+	pos, err := parseInterspersed(fs, rest)
+	if err != nil {
 		return err
 	}
 
@@ -76,12 +82,38 @@ func run(args []string) error {
 		return list(profile, *limit, *grep, *expand, *show, *asJSON, *asTOON)
 	case "dump":
 		out := "order-page.html"
-		if fs.NArg() > 0 {
-			out = fs.Arg(0)
+		if len(pos) > 0 {
+			out = pos[0]
 		}
 		return dump(profile, out)
+	case "item":
+		if len(pos) != 1 {
+			return fmt.Errorf("usage: ali item <id|url>")
+		}
+		return item(profile, pos[0], *show, *asJSON, *asTOON)
+	case "search":
+		if len(pos) == 0 {
+			return fmt.Errorf("usage: ali search <query>")
+		}
+		return search(profile, strings.Join(pos, " "), *shipsFrom, *limit, *show, *asJSON, *asTOON)
 	default:
 		return fmt.Errorf("unknown command %q (try `ali help`)", cmd)
+	}
+}
+
+// parseInterspersed lets flags follow positional arguments, so both
+// `ali item --json 123` and `ali item 123 --json` work.
+func parseInterspersed(fs *flag.FlagSet, args []string) ([]string, error) {
+	var pos []string
+	for {
+		if err := fs.Parse(args); err != nil {
+			return nil, err
+		}
+		if fs.NArg() == 0 {
+			return pos, nil
+		}
+		pos = append(pos, fs.Arg(0))
+		args = fs.Args()[1:]
 	}
 }
 
@@ -190,6 +222,122 @@ func list(profile string, limit int, grep string, expand, show, asJSON, asTOON b
 			fmt.Println("    " + truncate(it.Title, 96))
 		}
 		fmt.Println("    " + o.URL)
+	}
+	return nil
+}
+
+func item(profile, arg string, show, asJSON, asTOON bool) error {
+	id, err := catalog.ItemID(arg)
+	if err != nil {
+		return err
+	}
+	s, err := session(profile, !show, 2*time.Minute)
+	if err != nil {
+		return err
+	}
+	defer s.Close()
+
+	restore(s)
+
+	it, err := catalog.FetchItem(s.Ctx, id)
+	if err != nil {
+		return err
+	}
+	if asJSON || asTOON {
+		return emit(it, asTOON)
+	}
+	fmt.Println(it.Title)
+	price := fmt.Sprintf("%s %.2f", it.Currency, it.Price)
+	if it.Lowest30Days > 0 {
+		price += fmt.Sprintf("  (30-day lowest %.2f)", it.Lowest30Days)
+	}
+	fmt.Println("  price:     " + price)
+	tax := "VAT not stated"
+	if it.VATIncluded {
+		tax = "VAT included"
+	}
+	switch it.ImportCharges {
+	case "none":
+		tax += ", no import charges"
+	case "apply":
+		tax += ", import charges apply"
+	}
+	fmt.Println("  tax:       " + tax)
+	if it.ShipsFrom != "" {
+		fmt.Println("  ships from: " + it.ShipsFrom)
+	}
+	if it.Delivery != "" {
+		fmt.Println("  delivery:  " + it.Delivery)
+	}
+	if it.Rating != "" {
+		fmt.Printf("  rating:    %s (%s reviews)\n", it.Rating, it.Reviews)
+	}
+	if it.Sold != "" {
+		fmt.Println("  sold:      " + it.Sold)
+	}
+	if it.Store != "" {
+		store := it.Store
+		if it.StorePositive != "" {
+			store += " (" + it.StorePositive + " positive)"
+		}
+		fmt.Println("  store:     " + store)
+	}
+	for _, v := range it.Variants {
+		line := fmt.Sprintf("  %s: %s", v.Name, strings.Join(v.Options, ", "))
+		if v.Count > len(v.Options) {
+			line += fmt.Sprintf(" (%d options)", v.Count)
+		}
+		fmt.Println(line)
+	}
+	if it.Bundle {
+		fmt.Println("  bundle deals: yes")
+	}
+	fmt.Println("  " + it.URL)
+	return nil
+}
+
+func search(profile, query, shipsFrom string, limit int, show, asJSON, asTOON bool) error {
+	if limit <= 0 {
+		limit = 60
+	}
+	s, err := session(profile, !show, 2*time.Minute)
+	if err != nil {
+		return err
+	}
+	defer s.Close()
+
+	restore(s)
+
+	got, err := catalog.Search(s.Ctx, query, shipsFrom, limit)
+	if err != nil {
+		return err
+	}
+	if asJSON || asTOON {
+		return emit(got, asTOON)
+	}
+	if len(got) == 0 {
+		fmt.Fprintln(os.Stderr, "no results")
+		return nil
+	}
+	for _, r := range got {
+		line := fmt.Sprintf("%s  %s %.2f", r.ID, r.Currency, r.Price)
+		if r.Rating != "" {
+			line += "  " + r.Rating + "*"
+		}
+		if r.Sold != "" {
+			line += "  " + r.Sold + " sold"
+		}
+		if r.ShipsFrom != "" {
+			line += "  from " + r.ShipsFrom
+		}
+		if r.Badge != "" {
+			line += "  [" + r.Badge + "]"
+		}
+		if r.Bundle {
+			line += "  [bundle deals]"
+		}
+		fmt.Println(line)
+		fmt.Println("    " + truncate(r.Title, 96))
 	}
 	return nil
 }
