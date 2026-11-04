@@ -59,12 +59,12 @@ $ ali orders --grep wax
 
 ```
 $ ali item 1005011605911641
-Foursun 130000 RPM Turbo Violent Fan, 10-Speed with Display, ...
+Turbo Jet Fan 130000 RPM, 10-Speed with Display, ...
   price:     EUR 18.03  (30-day lowest 21.93)
   tax:       VAT included, no import charges
   ships from: Poland
   rating:    4.8 (1160 reviews)
-  store:     Foursun Auto Store (96.0% positive)
+  store:     Example Auto Store (96.0% positive)
 
 $ ali search "air blower" --ships-from PL --limit 3
 1005013370091652  EUR 29.13  12 sold  from PL

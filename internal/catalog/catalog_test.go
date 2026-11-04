@@ -3,7 +3,7 @@ package catalog
 import "testing"
 
 const itemText = `Related items
-Foursun 130000 RPM Turbo Violent Fan, 10-Speed with Display
+Turbo Jet Fan 130000 RPM, 10-Speed with Display
   4.8  
 1160 Reviews
   ౹  
@@ -16,13 +16,13 @@ Price includes VAT | No import charges
 Color Name: FT08
 Customer Reviews (1160)
 Sold By
-Foursun Auto Store
+Example Auto Store
 (Trader)
 Service commitment
 Free shipping ·  Ship from Poland 
 Fastest delivery in 7 days (80.9% ≤ 9 days)
 Quantity
-Foursun Auto Store
+Example Auto Store
 96.0% Positive Feedback | 446 Followers`
 
 func TestParseItem(t *testing.T) {
@@ -32,7 +32,7 @@ func TestParseItem(t *testing.T) {
 	}
 	if it.Price != 19.57 || it.Lowest30Days != 23.64 || !it.VATIncluded || it.ImportCharges != "none" ||
 		it.ShipsFrom != "Poland" || it.Reviews != "1160" || it.Sold != "10,000+" ||
-		it.Store != "Foursun Auto Store" || it.StorePositive != "96.0%" || it.Bundle {
+		it.Store != "Example Auto Store" || it.StorePositive != "96.0%" || it.Bundle {
 		t.Fatalf("unexpected parse: %+v", it)
 	}
 }
